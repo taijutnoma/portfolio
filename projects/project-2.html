@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HVAC Thermal Simulation | Taiju Noma</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  /* Scoped fallback styling for in-line figures, in case style.css doesn't already define these */
+  .project-figure { margin: 2rem 0; }
+  .project-figure img { width: 100%; height: auto; display: block; border-radius: 6px; }
+  .project-figure figcaption { margin-top: 0.6rem; font-size: 0.9rem; opacity: 0.75; text-align: center; }
+  .project-figure figcaption strong { opacity: 1; }
+</style>
+</head>
+<body>
+
+
+<header>
+<nav>
+<a href="../index.html" class="logo">Taiju Noma</a>
+<div class="nav-links">
+<a href="../index.html#home">Home</a>
+<a href="../index.html#resume">Resume</a>
+<a href="../index.html#projects">Projects</a>
+<a href="../index.html#about">About</a>
+<a href="../index.html#contact">Contact</a>
+</div>
+</nav>
+</header>
+
+
+<main class="project-page">
+
+
+<a href="../index.html#projects" class="back-link">← Back to Projects</a>
+
+
+<div class="project-hero">
+    <p class="project-label">MATLAB / Simulink / Thermal Modeling / Controls</p>
+    <h1>HVAC Thermal Simulation</h1>
+    <p class="project-summary">A transient, single-zone MATLAB/Simulink model of an off-grid cabin's air conditioning system, predicting indoor temperature, humidity, and electrical demand over a 24-hour period to support HVAC sizing and control-strategy decisions.</p>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/hvac-thermal-simulation-architecture-diagram.jpg" alt="Simulink block diagram of the HVAC model showing Controller, HVAC Performance, Ventilation, Energy Balance, Moisture Balance, Psychrometrics, and Data Logging blocks">
+        <figcaption><strong>Figure — System Architecture.</strong> Shows how weather and schedule inputs flow through the controller, HVAC performance, ventilation, energy and moisture balances, and psychrometrics blocks to produce the indoor state.</figcaption>
+    </figure>
+
+
+</div>
+
+
+<div class="project-meta">
+    <div class="project-meta-item"><span class="project-meta-label">ROLE</span><span class="project-meta-value">Individual Project — Model Development, Controls, Analysis</span></div><div class="project-meta-item"><span class="project-meta-label">TOOLS</span><span class="project-meta-value">MATLAB, Simulink</span></div><div class="project-meta-item"><span class="project-meta-label">YEAR</span><span class="project-meta-value">2026</span></div>
+</div>
+
+
+<section class="project-section">
+    <h2>System Overview</h2>
+    <p>This is a transient MATLAB simulation of an off-grid cabin's air conditioning system. It steps forward in six-minute increments across a 24-hour day, solving indoor temperature and indoor humidity ratio coupled first-order ODEs. This is done with real weather, occupancy, and equipment inputs. </p>
+
+
+    <p>The architecture diagram above is a map of how the code executes, read left to right. <code>Main</code> sits directly under the MATLAB front end because it's the only script the user runs with everything else called from it, in this order:</p>
+    <ul>
+        <li><strong>Setup</strong> — before the transient loop starts, <code>main</code> runs <code>simulation_parameters</code>, <code>constants_script</code>, <code>air_conditioner_parameters</code>, <code>weather_script</code>, <code>building_script</code>, <code>loads_script</code>, <code>moisture_script</code>, and <code>HVAC_script</code>, in that order. Each one hands the next whatever it needs: simulation settings and physical constants come first because everything else references them; weather has to load before moisture initialization can compute a starting humidity ratio from the initial pressure; and HVAC setup runs last because it needs the AC ratings already defined. By the time the loop starts, every fixed input and constant the transient calculation will need already exists.</li>
+        <li><strong>Controller → HVAC/Loads Calculations</strong> — once inside the timestep loop, the controller runs first because everything downstream depends on whether the AC is on. It takes the indoor temperature from the <em>previous</em> timestep, applies hysteresis plus occupancy setback, checks the minimum-runtime lock, and outputs a single AC state (0 or 1). That state then feeds the HVAC/Loads block, which computes AC COP, fan power, solar gain, ventilation, and envelope conduction for the current timestep — the AC's cooling output literally can't be calculated until the controller has decided whether it's running.</li>
+        <li><strong>RK4 steps</strong> — every heat and moisture term calculated in the previous block (envelope, ventilation, solar, internal, AC sensible/latent) is what gets summed inside <code>state_derivatives()</code> to form dT/dt and dw/dt. RK4 evaluates that function four times (the "4 slopes") at slightly different sub-step temperatures/humidities, combines them, and produces the updated <code>T_indoor</code> and <code>w_indoor</code> for the next timestep.</li>
+        <li><strong>The feedback loop</strong> — the line running from "Update T &amp; ω" back up to the Controller column is the actual <code>for</code> loop in <code>main.m</code>: the newly integrated temperature becomes the input the controller reads on the <em>next</em> iteration. Every other block is stateless from one timestep to the next — only temperature and humidity ratio persist and feed forward, which is what makes this a genuinely transient simulation rather than 24 independent steady-state solves.</li>
+        <li><strong>Results</strong> — once the loop finishes all timesteps, <code>main</code> reduces the full time-history arrays into energy totals, AC duty cycle, an overall system COP, and the temperature/humidity/power plots shown later on this page.</li>
+    </ul>
+    <p>Put another way: <code>weather_script</code>, <code>building_script</code>, and <code>loads_script</code> hand <code>main</code> the "world" the cabin exists in; the controller and HVAC block decide what the AC does to that world at each instant; the RK4 integration is where the physics actually gets solved; and the loopback is what turns a single timestep's calculation into a full 24-hour transient response.</p>
+</section>
+
+
+<section class="project-section">
+    <h2>Engineering Approach</h2>
+    <p>Every subsystem is derived directly from its governing physics rather than an empirical curve fit or a black-box block, and the model was built up in deliberate increments — starting from a bare-bones baseline (fixed ventilation, no thermal mass, constant COP, explicit Euler integration) and adding one mechanism at a time, checking after each addition that the result moved in the direction the physics predicted. That incremental process is what makes it possible to trust that a given result — say, the humidity dip once the AC engages — is coming from the mechanism it's supposed to, not a solver artifact.</p>
+</section>
+
+
+<section class="project-section">
+    <h2>How the Modules Work</h2>
+    <p>The modules below are ordered how the information moves through the simulation </p>
+
+
+    <h3>1. Simulation Parameters (<code>simulation_parameters.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes no upstream inputs and outputs the simulation time grid, an enable/disable flag for each physical process, initial indoor conditions, and controller tuning values, each defined by the user.</p>
+    <p>A six-minute timestep over a 24-hour day is the time vector. Flags (<code>ENABLE_SOLAR</code>, <code>ENABLE_THERMAL_MASS</code>, <code>ENABLE_VARIABLE_COP</code>, etc.) lets the user test each part independently. Setback and minimum-runtime values are defined here.</p>
+
+
+    <h3>2. Constants (<code>constants_script.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes no upstream inputs and outputs constants such as specific heat, latent heat, gas constant, reference air density, and the solar/thermal-mass/ventilation/COP coefficients, each defined by the user.</p>
+    <p>Centralizing constants and coefficients in this file keeps the simulation organized</p>
+
+
+    <h3>3. AC Parameters (<code>air_conditioner_parameters.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes the AC's rating in BTU/hr as input and outputs its rating in watts, rated COP, sensible/latent split, thermostat setpoints, and initial AC state.</p>
+    <p> SI conversion done for easier calculations. Splitting rated capacity into a fixed sensible fraction (<code>Frac_sens = 0.75</code>) because  a real evaporator coil removes both heat and moisture.</p>
+
+
+    <h3>4. Weather (<code>weather_script.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes hourly outdoor data files (dry-bulb temperature, dew point, pressure, wind speed, solar irradiance) as input, and outputs interpolated values per timestep ( <code>T_out</code>, <code>w_out</code>, <code>Patm_now</code>, <code>Wind_now</code>, <code>Solar_now</code>).</p>
+    <p> Each value is interpolated to the timegrid defined in simulation parameters and the first hour's values are duplicated at hour 24 so the interpolation wraps cleanly overnight. Outdoor humidity ratio is determined from dew point using the Magnus equation, <code>Psat = 610.94*exp(17.625*T/(T+243.04))</code> using the current interpolated pressure.</p>
+
+
+    <h3>5. Building Envelope (<code>building_script.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes housing geometry and U values as input and outputs envelope conductance (<code>UA_shell</code>) and thermal capacitance (<code>C_building</code>) every timestep.</p>
+    <p> Uses Fourier's law in lumped form, <code>Q = UA·ΔT</code> and solvess for U and A here. Thermal mass also uses area normalized heat capacities for wall, roof, and floor, added to the air's own thermal mass (<code>m_air = ρ·V_air</code>, <code>C_air = m_air·cp</code>) to ensure the cabin responds gradually to changing conditions instead of instantaneous changes.</p>
+
+
+    <h3>6. Internal Loads (<code>loads_script.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes hourly occupancy and equipment schedule files as inputs and outputs sensible heat gain (<code>sens_gain(n)</code>) and moisture generation (<code>vap_gen(n)</code>) every timestep. </p>
+    <p>Assigns a 0 or 1 value for every timestep to indicate if the occupant or equipment is generating moisture or heat. This 0 or 1 value is multiplied by activity such as cooking.</p>
+
+
+    <h3>7. Moisture Initialization (<code>moisture_script.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes the initial indoor temperature and RH from Simulation Parameters and the starting atmospheric pressure from Weather as input and outputs the initial humidity ratio, vapor pressure, and dew point.</p>
+    <p>Magnus equation is used to determine initial psychrometric values used in later coupled equations.</p>
+
+
+    <h3>8. HVAC Setup (<code>HVAC_script.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes rated capacity, COP, and sensible/latent fractions from AC Parameters as input and outputs rated sensible/latent capacity and rated (compressor-only) electrical power, plus the zeroed result arrays the transient loop will fill in.</p>
+    <p> <code>Q_AC_sens_rated</code> and <code>P_AC_rated</code> are references used to size the initial arrays and for performance comparisons. They aren't values used during the simulation since COP is not constant. Real COP and fan power are computed by the AC Performance script on every timestep. They are separated to compare how much a given timestep's real performance has degraded from the equipment's rated performance.</p>
+
+
+    <h3>9. Controller (<code>controller_step()</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes the indoor temperature from the previous timestep's integration and the occupancy/activity schedule as input and outputs a single <code>AC_state</code> (0 or 1) for the current timestep.</p>
+    <p> AC turns on at the upper deadband, off at the lower one, and holds state in between, based on real thermostat hysteresis. Occupancy based setback changes both thresholds when the cabin is asleep or unoccupied since an empty home requires less cooling. A minimum runtime check blocks state change if too little time has passed since the last switch to stop the compressor from short-cycling.</p>
+
+
+    <h3>10. AC Performance (<code>hvac_step()</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes <code>AC_state</code> from the Controller and <code>T_out</code> from Weather as input and outputs the cooling delivered (<code>Q_AC_sens</code> and <code>Q_AC_lat</code>), power drawn (<code>P_AC</code>), and moisture removal rate (<code>m_dot_vap_AC</code>).</p>
+    <p>Real AC performance degrades in hot weather so COP is corrected linearly with outdoor temperature above the rated condition and floored at a minimum fraction so it can't collapse toward zero with the formula: <code>COP = COP_rated·max(1 − k·(T_out − T_rated), COP_min_frac)</code>. Cooling output is split into sensible and latent fractions of rated capacity, since a real evaporator coil removes both heat and moisture at once, and electrical draw is the cooling load divided by that variable COP plus a constant fan power, <code>P_AC = Q_AC/COP + P_fan</code>.</p>
+
+
+    <h3>11. Solar Gain (<code>solar_gain()</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes solar irradiance from Weather and glazing area from Building as input and outputs a single sensible heat term (<code>Q_solar</code>).</p>
+    <p>M This sensible heat term is equal to irradiance times the window's solar heat gain coefficient times glazing area (<code>Q_solar = GHI · SHGC · A_glazing</code>). The north/south and east/west-facing glazing were given their own incidence factors so windows facing different directions contribute differently. It's a simplified placeholder for real solar gains but modeling realistic shading and sunlight positioning would have been enormous work for little gain. </p>
+
+
+    <h3>12. Ventilation (<code>ventilation_flow()</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes the current indoor temperature, wind speed and atmospheric pressure from Weather script as input and outputs a ventilation heat transfer conductance and moisture-transfer term, <code>Q_ventilation</code> and <code>m_dot_vap_vent</code>.</p>
+    <p>Infiltration is treated as a baseline air-change rate (from Simulation Parameters) plus a term proportional to wind speed, <code>ACH = ACH_base + k·Wind</code>, grounding it in the actual physical driver — wind-induced pressure difference — instead of a fixed schedule. Air density is computed from the ideal gas law using the current pressure and indoor temperature, <code>ρ = P/(R·T)</code>, so the resulting mass flow (<code>mdot = ACH·V·ρ/3600</code>) and its equivalent thermal conductance (<code>UA_venti = mdot·cp</code>) stay physically consistent as weather changes through the day, instead of assuming a fixed air density year-round.</p>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/hvac-thermal-simulation-hvac-thermal-loads.png" alt="Plot of envelope heat transfer, ventilation heat transfer, solar gain, internal heat gain, and AC sensible cooling over 24 hours">
+        <figcaption><strong>Figure — Sensible Load Breakdown.</strong> Every sensible term produced by modules 5, 6, 10, 11, and 12 above, plotted together as they feed into the same energy balance.</figcaption>
+    </figure>
+
+
+    <h3>13. Integration (<code>state_derivatives()</code> + RK4, in <code>main.m</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes every heat and moisture term produced by the modules above (envelope, ventilation, solar, internal, and AC sensible/latent) as input and outputs the updated indoor temperature and humidity ratio for the next timestep (<code>T_indoor(n+1)</code> and <code>w_indoor(n+1)</code>).</p>
+    <p>The energy balance sums those terms and divides by the building's thermal capacitance, <code>dT/dt = (Q_envelope + Q_ventilation + Q_internal + Q_solar − Q_AC_sens) / C_building</code>, while the moisture balance sums generation, ventilation transfer, and AC removal divided by air mass, <code>dw/dt = (vap_gen + m_dot_vap_vent − m_dot_vap_AC) / m_air</code> — both packaged into one <code>state_derivatives()</code> function. Rather than the explicit Euler integration used in the model's first version, both states are now advanced together with classical 4th-order Runge-Kutta, which evaluates that function at four sub-step points and combines them for a meaningfully more accurate result at the same six-minute timestep. The resulting <code>T_indoor(n+1)</code> is exactly what the Controller (module 9) reads as its input on the next loop iteration — this is what closes the loop and makes the simulation transient rather than 24 independent steady-state solves.</p>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/hvac-thermal-simulation-ac-operation-electrical-power.png" alt="Plot of AC on/off state and electrical power draw over 24 hours">
+        <figcaption><strong>Figure — AC Operation and Electrical Power.</strong> The Controller's AC_state (module 9) and AC Performance's electrical draw (module 10), shown together across the day.</figcaption>
+    </figure>
+
+
+    <h3>14. Moisture &amp; Psychrometrics Recovery (<code>psychrometrics_from_w()</code>)</h3>
+    <p><strong>Inputs and Outputs:</strong> Takes the integrated humidity ratio and temperature as input and outputs relative humidity and dew point (<code>RH_indoor</code> and <code>T_dew_indoor</code>).</p>
+    <p>Rather than tracking RH as its own state, the model tracks humidity ratio via true mass conservation of water vapor and recovers RH and dew point algebraically using the Magnus saturation curve (<code>RH = 100 · P_vapor / Psat</code>). Keeping the recovery separate from the integrated state means temperature and moisture stay coupled through one consistent set of equations. Its outputs are logged for the Results plots but aren't read by any other module in the loop which means this is the one module that doesn't feed back into the next timestep.</p>
+
+
+    <h3>The Feedback Loop and Control System</h3>
+    <p><strong>Loop:</strong> Each iteration, the Controller (module 9) reads <code>T_indoor(n)</code> and outputs <code>AC_state</code>; that state drives AC Performance and, with the other load modules, gets integrated by module 13 into <code>T_indoor(n+1)</code> — which is exactly what the Controller reads on the next iteration. That's the whole loop: one measurement (temperature) goes out, one decision (AC state) comes back, closing on itself every timestep. Weather, solar, and internal loads are disturbances that push on the plant from outside this loop — the controller only ever reacts to their effect on temperature, never to the disturbances directly. Notably, humidity ratio has no equivalent loop: nothing measures RH or decides to dehumidify, so the AC's latent removal is only a side effect of running for temperature — which is why RH is free to drift for hours before the AC engages, as shown in the Results below.</p>
+    <p><strong>Design choices:</strong> The compressor genuinely only has two states, so a continuous controller like PID would be solving the wrong problem — hysteresis (a dead zone between <code>T_lower</code> and <code>T_upper</code> where the AC holds its prior state) is the standard fix for chattering a bang-bang device right at a single setpoint. Setback widens that dead zone further when the cabin doesn't need to be held tightly (asleep/unoccupied), trading comfort for fewer, longer AC cycles. The minimum-runtime lock is a separate, independent safeguard on top of hysteresis — it blocks a state change purely on elapsed time since the last switch, which is the one failure mode hysteresis can't catch on its own: a fast-moving disturbance (a solar gain spike) that swings temperature across the whole dead zone quickly.</p>
+</section>
+
+
+
+
+<section class="project-section">
+    <h2>Results Analysis</h2>
+    <p>Outdoor temperature swings from ~24 °C overnight to ~40.3 °C in mid-afternoon; indoor temperature rises far more gradually to a peak of ~30.3 °C, lagging the outdoor peak by several hours — thermal mass storing and releasing heat as intended. Solar gain dominates the sensible load, peaking near 4,200 W at midday, roughly five times envelope or ventilation heat transfer at their own peaks — the clearest lever for improving this design is better glazing/shading, not more insulation. Indoor RH climbs from ~45% to ~68% overnight purely from internal moisture and ventilation ingress, well before the AC ever runs, then falls to ~10% once sustained afternoon cooling begins — confirming temperature and humidity are coupled but distinct control problems. Tying ventilation to wind speed produces total ACH that tracks wind almost in lockstep, peaking near 1.3 ACH alongside a wind peak of ~5.7 m/s, and AC electrical power peaks near 1,300 W during the sustained afternoon run — the actual number an off-grid solar/battery bank has to be sized against, distinct from the cooling capacity itself.</p>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/hvac-thermal-simulation-indoor-outdoor-temperature.png" alt="Plot of indoor temperature, outdoor temperature, and thermostat setpoint over 24 hours">
+        <figcaption><strong>Figure — Indoor and Outdoor Temperature.</strong> Indoor temperature stays near setpoint despite wide outdoor swings, with the thermal-mass lag visible at the peak.</figcaption>
+    </figure>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/hvac-thermal-simulation-indoor-relative-humidity.png" alt="Plot of indoor relative humidity over 24 hours with initial RH reference line">
+        <figcaption><strong>Figure — Indoor Relative Humidity.</strong> RH rises well before the AC engages and only drops once sustained latent cooling begins in the afternoon.</figcaption>
+    </figure>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/hvac-thermal-simulation-wind-speed-air-change-rate.png" alt="Plot of wind speed and resulting total air-change rate over 24 hours">
+        <figcaption><strong>Figure — Wind Speed and Total Air-Change Rate.</strong> Total ACH tracks wind speed closely, confirming the wind-driven infiltration model behaves as designed.</figcaption>
+    </figure>
+</section>
+
+<div class="project-nav">
+    <a href="project-1.html">← Previous Project</a>
+    <a href="project-3.html">Next Project →</a>
+</div>
+
+
+</main>
+
+
+<footer><p>© 2026 Taiju Noma</p></footer>
+
+
+</body>
+</html>
+
+
+
