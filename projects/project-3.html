@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tidal Turbine | Taiju Noma</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+
+<header>
+<nav>
+<a href="../index.html" class="logo">Taiju Noma</a>
+<div class="nav-links">
+<a href="../index.html#home">Home</a>
+<a href="../index.html#projects">Projects</a>
+<a href="../index.html#contact">Contact</a>
+</div>
+</nav>
+</header>
+
+
+<main class="project-page">
+
+
+<a href="../index.html#projects" class="back-link">← Back to Projects</a>
+
+
+<div class="project-hero">
+    <p class="project-label">Fluid Dynamics / Controls / Fusion 360</p>
+    <h1>Tidal Turbine</h1>
+    <p class="project-summary">Design of a model-scale marine hydrokinetic tidal turbine for the Gulf Stream: CAD, CFD hydrodynamic characterization, and a first-pass structural and cavitation analysis in Ansys Mechanical.</p>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/CAD_ss.png" alt="Plot of AC on/off state and electrical power draw over 24 hours">
+        <figcaption><strong>Figure - CAD model made in Autodesk CFD.</strong> </figcaption>
+    </figure>
+
+
+</div>
+
+
+<div class="project-meta">
+    <div class="project-meta-item"><span class="project-meta-label">ROLE</span><span class="project-meta-value">Independent project</span></div><div class="project-meta-item"><span class="project-meta-label">TOOLS</span><span class="project-meta-value">Fusion 360, Autodesk CFD, MATLAB, Ansys Mechanical</span></div><div class="project-meta-item"><span class="project-meta-label">YEAR</span><span class="project-meta-value">2026</span></div>
+</div>
+
+
+<section class="project-section">
+    <h2>Project Motivation and Objective</h2>
+    <p>This project is the independent, end-to-end development of a model-scale marine hydrokinetic (MHK) tidal turbine, designed against real-world inflow conditions from the Gulf Stream off Cape Hatteras, NC. Design includes hydrodynamic shape design, CFD performance characterization, structural analysis. The goals were to design a 3-bladed, lift-based rotor sized for the Gulf Stream's current conditions; characterize its hydrodynamic performance across a range of operating points (a Cp-vs-tip-speed-ratio sweep) to identify optimal operating RPM; and use that characterization to drive both a structural load case for FEA.</p>
+</section>
+
+
+<section class="project-section">
+    <h2>Design Basis</h2>
+    <ul>
+        <li><strong>Scale:</strong> model-scale CFD geometry, rotor radius R = 147 mm (294 mm diameter); full-scale relationships deliberately deferred to a later phase.</li>
+        <li><strong>Rotor:</strong> 3-bladed, lift-based, blades patterned at 120° with confirmed equal root radius (~46.57 mm).</li>
+        <li><strong>Design inflow:</strong> Gulf Stream ADCP data — mean current ~2.32 m/s, peak ~2.57 m/s.</li>
+        <li><strong>Prototype material:</strong> PLA</li>
+    </ul>
+</section>
+
+
+<figure class="project-figure">
+        <img src="../assets/images/CFD_ss.png" alt="Plot of AC on/off state and electrical power draw over 24 hours">
+        <figcaption><strong>Figure - CFD velocity profile.</strong> </figcaption>
+</figure>
+
+
+<section class="project-section">
+    <h2>CFD: Autodesk CFD 2027</h2>
+    <p>The purpose of the CFD was to find the ideal RPM to maximize power output and find loads for the structural analysis in Ansys. The setup used a sliding mesh where a rotating fluid domain was used around the rotor and a large stationary fluid domain was used for the non rotating parts of the turbine. 5 simulations were run for tip speed ratio (TSR) values 3 through 7, where the fluid domain was spun at rpms 452.1, 602.86, 753.5, 904.3, and 1055.0. These rpms were determined with the formula RPM = (λ × V∞ ) / ( R)*(60/2π), where lambda is TSR, velocity is 2.32m/s, and R is the turbine blade length at 14.7 cm. The boundary conditions used the front wall at 2.32 m/s flow and a back wall of  0 Pa pressure. The water density used was 1025 kg/m3. I ran these simulations until results converged within 2% of the previous revolution.
+
+At every TSR, the torque, thrust load, and minimum static pressure was recorded. Using MATLAB, the power coefficient was calculated  using the formula Cp​=T*ω/(1/2*​ρ*A*U^3)​ and was plotted with TSR. The optimal TSR was found to be 4.2 with a RPM of 632.9. At this TSR, the torque was 1.9 N/m, thrust load was 119.2 N, and minimum static gauge pressure was −24.4 kPa.</p>
+</section>
+
+
+<figure class="project-figure">
+        <img src="../assets/images/CPvsTSR.png" alt="Plot of AC on/off state and electrical power draw over 24 hours">
+        <figcaption><strong>Figure - Power Coefficient vs Tip Speed Ratio.</strong> </figcaption>
+</figure>
+
+
+<section class="project-section">
+<h2>Cavitation and Structural Analysis</h2>
+
+
+    <h3>Cavitation</h3>
+    <p>I tested for Cavitation by comparing the minimum absolute local static pressure on the blade against water's absolute vapor pressure of 7.38 kPa at 40 Celsius. Minimum absolute static pressure was 76.9 kPa (−24.4 kPa in gauge pressure). This value is well below cavitation.</p>
+
+
+    <figure class="project-figure">
+        <img src="../assets/images/cavitation_pressure.png" alt="CFD static pressure contour on the rotor showing minimum pressure region on the blade suction side">
+        <figcaption><strong>Figure - Static pressure field used for the cavitation check (min −24.4 kPa, max 59.4 kPa gauge pressures at this operating point).</strong></figcaption>
+    </figure>
+
+
+    <h3>Structural Analysis FEA: Ansys Mechanical (Static Structural)</h3>
+    <p>Plastic PLA was used with its default properties from the library. The setup of the simulation included a fixed support at the blade root, a rotational velocity for centrifugal loading, a thrust force of 119.2 and a moment of 1.92 N/m on the blade, both load values from the CFD analysis.
+
+The results of the analysis are shown in these images: 
+</p>
+   
+    <figure class="project-figure">
+        <img src="../assets/images/FEA_deformation.png" alt="Ansys Mechanical total deformation contour on the rotor blade, max 1.57 mm at the tip">
+        <figcaption><strong>Figure - Total deformation, max 1.57 mm at the blade tip.</strong></figcaption>
+    </figure>
+    <figure class="project-figure">
+        <img src="../assets/images/FEA_strain.png" alt="Ansys Mechanical equivalent elastic strain contour on the rotor blade">
+        <figcaption><strong>Figure - Equivalent elastic strain, max 8.76×10⁻⁴.</strong></figcaption>
+    </figure>
+    <figure class="project-figure">
+        <img src="../assets/images/FEA_stress.png" alt="Ansys Mechanical equivalent von-Mises stress contour on the rotor blade">
+        <figcaption><strong>Figure - Equivalent (von-Mises) stress, max 2.56 MPa.</strong></figcaption>
+    </figure>
+
+
+    <p><strong>Next steps.</strong> Test for fatigue and bending stress. 3D print components, find an appropriate motor and construct a full prototype. Test the physical design in a wind tunnel.</p>
+</section>
+
+<div class="project-nav">
+    <a href="project-2.html">← Previous Project</a>
+    <a href="project-1.html">Next Project →</a>
+</div>
+
+
+</main>
+
+
+<footer><p>© 2026 Taiju Noma</p></footer>
+
+
+</body>
+</html>
